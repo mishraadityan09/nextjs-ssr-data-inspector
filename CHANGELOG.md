@@ -3,6 +3,16 @@
 All notable changes to this extension are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-06-15
+
+### Changed
+
+- Redesigned the panel into a **Network-tab–style** UI: a sortable columnar
+  table (Name · Method · Status · Size · Time) with **waterfall bars** and row
+  selection, plus a **resizable split detail pane** with **Headers / Response /
+  Timing** tabs. Response has a **Tree ⇄ Raw** toggle and **Copy JSON**.
+- Added 3xx / 4xx / 5xx status filters and a size+time summary.
+
 ## [0.1.0] — 2026-06-15
 
 ### Added

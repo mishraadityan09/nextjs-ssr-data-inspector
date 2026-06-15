@@ -1,30 +1,39 @@
-// Reads the SSR fetch log a Next.js / SSR app embeds in the inspected page
-// (a <script type="application/json" id="…"> holding an array of
-// { method, url, status, ok, durationMs, ts?, body?, error? }) and renders it
-// as a filterable, collapsible, syntax-highlighted tree.
-//
-// Uses chrome.devtools.inspectedWindow.eval, so the extension needs no host
-// permissions — it only ever reads the page currently open in DevTools.
+// Network-tab–style viewer for the server-side fetch log an SSR app embeds in
+// the page (a <script type="application/json" id="…"> array of
+// { method, url, status, ok, durationMs, ts?, size?, reqHeaders?, resHeaders?, body?, error? }).
+// Uses chrome.devtools.inspectedWindow.eval, so it needs no host permissions.
 
 const DEFAULT_ID = "__ssr_data";
 
 const els = {
-  root: document.getElementById("root"),
-  summary: document.getElementById("summary"),
+  refresh: document.getElementById("refresh"),
   filter: document.getElementById("filter"),
   statusFilter: document.getElementById("statusFilter"),
-  refresh: document.getElementById("refresh"),
-  toggleAll: document.getElementById("toggleAll"),
   clear: document.getElementById("clear"),
   gear: document.getElementById("gear"),
+  summary: document.getElementById("summary"),
   settings: document.getElementById("settings"),
   elementId: document.getElementById("elementId"),
   saveId: document.getElementById("saveId"),
+  resetColors: document.getElementById("resetColors"),
+  net: document.getElementById("net"),
+  head: document.getElementById("head"),
+  rows: document.getElementById("rows"),
+  empty: document.getElementById("empty"),
+  divider: document.getElementById("divider"),
+  detail: document.getElementById("detail"),
+  detailBody: document.getElementById("detailBody"),
+  detailClose: document.getElementById("detailClose"),
 };
 
 let elementId = DEFAULT_ID;
 let entries = []; // last read, unfiltered
-let allOpen = true;
+let filtered = [];
+let selectedEntry = null;
+let sortKey = null; // null = insertion order
+let sortDir = 1; // 1 asc, -1 desc
+let detailTab = "headers";
+let rawResponse = false;
 let retryTimer = null;
 
 /* ---------- theme ---------- */
@@ -34,7 +43,7 @@ try {
   }
 } catch (e) {}
 
-/* ---------- read from the inspected page ---------- */
+/* ---------- read inspected page ---------- */
 function readData(cb) {
   const expr =
     "(function(){var el=document.getElementById(" +
@@ -53,18 +62,12 @@ function readData(cb) {
   });
 }
 
-// Scan the page for likely SSR-data elements so first-time users don't have to
-// know the id. Returns [{id, count}] for every <script type="application/json">
-// (with an id) whose content is an array of fetch-like entries.
 const DETECT_EXPR =
   "(function(){try{var out=[];var els=document.querySelectorAll('script[type=\"application/json\"]');for(var i=0;i<els.length;i++){var el=els[i];if(!el.id)continue;try{var v=JSON.parse(el.textContent);if(Array.isArray(v)&&v.length&&v[0]&&typeof v[0]==='object'&&('url' in v[0]||'method' in v[0]||'status' in v[0])){out.push({id:el.id,count:v.length});}}catch(e){}}return JSON.stringify(out);}catch(e){return '[]';}})()";
 
 function detect(cb) {
   chrome.devtools.inspectedWindow.eval(DETECT_EXPR, function (result, isException) {
-    if (isException || !result) {
-      cb([]);
-      return;
-    }
+    if (isException || !result) return cb([]);
     try {
       cb(JSON.parse(result));
     } catch (e) {
@@ -81,38 +84,6 @@ function statusClass(s) {
   if (s < 500) return "warn";
   return "err";
 }
-function fmtSize(n) {
-  if (n == null) return "";
-  if (n < 1024) return n + " B";
-  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
-  return (n / 1048576).toFixed(1) + " MB";
-}
-function headerSection(title, h) {
-  if (!h || !Object.keys(h).length) return null;
-  const det = document.createElement("details");
-  det.className = "hdr";
-  const sum = document.createElement("summary");
-  sum.className = "hdr-sum";
-  sum.textContent = title + " (" + Object.keys(h).length + ")";
-  det.appendChild(sum);
-  const body = document.createElement("div");
-  body.className = "hdr-body";
-  Object.keys(h).forEach(function (k) {
-    const row = document.createElement("div");
-    row.className = "hdr-row";
-    const key = document.createElement("span");
-    key.className = "hdr-key";
-    key.textContent = k + ": ";
-    const val = document.createElement("span");
-    val.className = "hdr-val";
-    val.textContent = String(h[k]);
-    row.appendChild(key);
-    row.appendChild(val);
-    body.appendChild(row);
-  });
-  det.appendChild(body);
-  return det;
-}
 function shortUrl(u) {
   try {
     const p = new URL(u);
@@ -120,6 +91,17 @@ function shortUrl(u) {
   } catch (e) {
     return u || "";
   }
+}
+function fmtSize(n) {
+  if (n == null) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+}
+function fmtTime(ms) {
+  if (ms == null) return "";
+  if (ms < 1000) return ms + " ms";
+  return (ms / 1000).toFixed(2) + " s";
 }
 function timeLabel(ts) {
   if (!ts) return "";
@@ -141,11 +123,9 @@ function valueNode(value) {
   if (value !== null && typeof value === "object") {
     const isArr = Array.isArray(value);
     const keys = isArr ? value.map((_, i) => i) : Object.keys(value);
-
     const det = document.createElement("details");
     det.className = "node";
-    det.open = allOpen;
-
+    det.open = true;
     const sum = document.createElement("summary");
     sum.className = "node-sum";
     sum.appendChild(punct(isArr ? "[" : "{"));
@@ -155,26 +135,24 @@ function valueNode(value) {
     sum.appendChild(meta);
     sum.appendChild(punct(isArr ? "]" : "}"));
     det.appendChild(sum);
-
     const body = document.createElement("div");
     body.className = "node-body";
     keys.forEach(function (k) {
-      const kv = document.createElement("div");
-      kv.className = "kv";
+      const line = document.createElement("div");
+      line.className = "kvline";
       if (!isArr) {
         const key = document.createElement("span");
         key.className = "tok-key";
         key.textContent = JSON.stringify(k);
-        kv.appendChild(key);
-        kv.appendChild(punct(": "));
+        line.appendChild(key);
+        line.appendChild(punct(": "));
       }
-      kv.appendChild(valueNode(value[k]));
-      body.appendChild(kv);
+      line.appendChild(valueNode(value[k]));
+      body.appendChild(line);
     });
     det.appendChild(body);
     return det;
   }
-
   const span = document.createElement("span");
   if (value === null) {
     span.className = "tok-null";
@@ -194,85 +172,144 @@ function valueNode(value) {
   return span;
 }
 
-/* ---------- rows ---------- */
-function callRow(entry) {
-  const det = document.createElement("details");
-  det.className = "call";
-  det.open = allOpen;
-
-  const sum = document.createElement("summary");
-  sum.className = "call-sum";
-
-  const method = document.createElement("span");
-  method.className = "method m-" + (entry.method || "GET").toUpperCase();
-  method.textContent = entry.method || "GET";
-
-  const url = document.createElement("span");
-  url.className = "url";
-  url.textContent = shortUrl(entry.url);
-  url.title = entry.url || "";
-
-  const pill = document.createElement("span");
-  pill.className = "pill " + statusClass(entry.status);
-  pill.textContent = entry.status != null ? entry.status : "—";
-
-  const size = document.createElement("span");
-  size.className = "size";
-  size.textContent = fmtSize(entry.size);
-
-  const dur = document.createElement("span");
-  dur.className = "dur";
-  dur.textContent = entry.durationMs != null ? entry.durationMs + "ms" : "";
-
-  const ts = document.createElement("span");
-  ts.className = "ts";
-  ts.textContent = timeLabel(entry.ts);
-
-  const copy = document.createElement("button");
-  copy.className = "copy";
-  copy.textContent = "Copy";
-  copy.title = "Copy JSON";
-
-  const payload = entry.error != null ? { error: entry.error } : entry.body;
-  copy.addEventListener("click", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const text = JSON.stringify(payload, null, 2);
-    try {
-      navigator.clipboard.writeText(text);
-    } catch (err) {}
-    copy.textContent = "Copied";
-    setTimeout(function () {
-      copy.textContent = "Copy";
-    }, 1000);
+/* ---------- detail pane blocks ---------- */
+function kvBlock(title, pairs) {
+  const block = document.createElement("div");
+  block.className = "block";
+  const h = document.createElement("div");
+  h.className = "block-title";
+  h.textContent = title;
+  block.appendChild(h);
+  pairs.forEach(function (p) {
+    if (p[1] == null || p[1] === "") return;
+    const row = document.createElement("div");
+    row.className = "kv";
+    const k = document.createElement("span");
+    k.className = "k";
+    k.textContent = p[0] + ":";
+    const v = document.createElement("span");
+    v.className = "v";
+    v.textContent = String(p[1]);
+    row.appendChild(k);
+    row.appendChild(v);
+    block.appendChild(row);
   });
-
-  sum.appendChild(method);
-  sum.appendChild(url);
-  sum.appendChild(pill);
-  sum.appendChild(size);
-  sum.appendChild(dur);
-  sum.appendChild(ts);
-  sum.appendChild(copy);
-  det.appendChild(sum);
-
-  const detail = document.createElement("div");
-  detail.className = "detail";
-  const reqH = headerSection("Request headers", entry.reqHeaders);
-  const resH = headerSection("Response headers", entry.resHeaders);
-  if (reqH) detail.appendChild(reqH);
-  if (resH) detail.appendChild(resH);
-
-  const tree = document.createElement("div");
-  tree.className = "tree";
-  tree.appendChild(valueNode(payload));
-  detail.appendChild(tree);
-  det.appendChild(detail);
-
-  return det;
+  return block;
+}
+function headerBlock(title, h) {
+  if (!h || !Object.keys(h).length) return null;
+  const pairs = Object.keys(h).map(function (k) {
+    return [k, h[k]];
+  });
+  return kvBlock(title, pairs);
 }
 
-/* ---------- filtering + render ---------- */
+function renderDetail() {
+  if (!selectedEntry) {
+    els.detail.hidden = true;
+    els.divider.hidden = true;
+    return;
+  }
+  els.detail.hidden = false;
+  els.divider.hidden = false;
+  const tabs = els.detail.querySelectorAll(".dtab");
+  Array.prototype.forEach.call(tabs, function (b) {
+    b.classList.toggle("active", b.dataset.tab === detailTab);
+  });
+
+  const e = selectedEntry;
+  const body = els.detailBody;
+  body.textContent = "";
+
+  if (detailTab === "headers") {
+    body.appendChild(
+      kvBlock("General", [
+        ["Request URL", e.url],
+        ["Method", e.method || "GET"],
+        ["Status", e.status != null ? e.status : "—"],
+        ["Size", fmtSize(e.size)],
+        ["Time", fmtTime(e.durationMs)],
+        ["When", timeLabel(e.ts)],
+        ["Error", e.error],
+      ]),
+    );
+    const rq = headerBlock("Request Headers", e.reqHeaders);
+    const rs = headerBlock("Response Headers", e.resHeaders);
+    if (rq) body.appendChild(rq);
+    if (rs) body.appendChild(rs);
+    if (!rq && !rs) {
+      const none = document.createElement("div");
+      none.className = "hint";
+      none.textContent = "No headers captured for this call.";
+      body.appendChild(none);
+    }
+  } else if (detailTab === "response") {
+    const payload = e.error != null ? { error: e.error } : e.body;
+    const bar = document.createElement("div");
+    bar.className = "resp-bar";
+    const copy = document.createElement("button");
+    copy.className = "btn";
+    copy.textContent = "Copy JSON";
+    copy.addEventListener("click", function () {
+      try {
+        navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      } catch (err) {}
+      copy.textContent = "Copied";
+      setTimeout(function () {
+        copy.textContent = "Copy JSON";
+      }, 1000);
+    });
+    const rawBtn = document.createElement("button");
+    rawBtn.className = "btn";
+    rawBtn.textContent = rawResponse ? "Tree" : "Raw";
+    rawBtn.addEventListener("click", function () {
+      rawResponse = !rawResponse;
+      renderDetail();
+    });
+    bar.appendChild(copy);
+    bar.appendChild(rawBtn);
+    body.appendChild(bar);
+
+    if (payload === undefined) {
+      const none = document.createElement("div");
+      none.className = "hint";
+      none.textContent = "No response body captured.";
+      body.appendChild(none);
+    } else if (rawResponse) {
+      const pre = document.createElement("pre");
+      pre.className = "raw";
+      pre.textContent = JSON.stringify(payload, null, 2);
+      body.appendChild(pre);
+    } else {
+      const tree = document.createElement("div");
+      tree.className = "tree";
+      tree.appendChild(valueNode(payload));
+      body.appendChild(tree);
+    }
+  } else {
+    // timing
+    const block = kvBlock("Timing", [
+      ["Started", timeLabel(e.ts)],
+      ["Duration", fmtTime(e.durationMs)],
+    ]);
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.width = Math.max(4, Math.min(100, (e.durationMs || 0) / 30)) + "px";
+    block.appendChild(bar);
+    body.appendChild(block);
+  }
+}
+
+function selectRow(entry, tr) {
+  selectedEntry = entry;
+  Array.prototype.forEach.call(els.rows.querySelectorAll("tr.selected"), function (x) {
+    x.classList.remove("selected");
+  });
+  if (tr) tr.classList.add("selected");
+  renderDetail();
+}
+
+/* ---------- table ---------- */
 function applyFilters(list) {
   const text = els.filter.value.trim().toLowerCase();
   const sf = els.statusFilter.value;
@@ -280,71 +317,131 @@ function applyFilters(list) {
     if (text && !(e.url || "").toLowerCase().includes(text)) return false;
     const s = e.status;
     if (sf === "2xx") return s >= 200 && s < 300;
-    if (sf === "non2xx") return s && !(s >= 200 && s < 300);
+    if (sf === "3xx") return s >= 300 && s < 400;
+    if (sf === "4xx") return s >= 400 && s < 500;
+    if (sf === "5xx") return s >= 500;
     if (sf === "err") return !s || e.error != null;
     return true;
   });
 }
+function sortList(list) {
+  if (!sortKey) return list;
+  return list.slice().sort(function (a, b) {
+    let av = a[sortKey];
+    let bv = b[sortKey];
+    if (sortKey === "url" || sortKey === "method") {
+      av = (av || "").toString().toLowerCase();
+      bv = (bv || "").toString().toLowerCase();
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    }
+    return ((Number(av) || 0) - (Number(bv) || 0)) * sortDir;
+  });
+}
+function updateSortIndicators() {
+  Array.prototype.forEach.call(els.head.querySelectorAll("th"), function (th) {
+    const base = th.dataset.label || th.textContent;
+    th.dataset.label = base;
+    th.textContent =
+      base + (th.dataset.key === sortKey ? (sortDir > 0 ? " ▲" : " ▼") : "");
+  });
+}
+function renderRows(list) {
+  els.rows.textContent = "";
+  const maxDur = list.reduce(function (m, e) {
+    return Math.max(m, e.durationMs || 0);
+  }, 0) || 1;
+
+  list.forEach(function (entry) {
+    const tr = document.createElement("tr");
+    if (entry === selectedEntry) tr.classList.add("selected");
+
+    const name = document.createElement("td");
+    name.className = "cell-name";
+    name.textContent = shortUrl(entry.url);
+    name.title = entry.url || "";
+
+    const method = document.createElement("td");
+    method.className = "cell-method m-" + (entry.method || "GET").toUpperCase();
+    method.textContent = entry.method || "GET";
+
+    const status = document.createElement("td");
+    status.className = "cell-status s-" + statusClass(entry.status);
+    status.textContent = entry.status != null ? entry.status : "—";
+
+    const size = document.createElement("td");
+    size.className = "cell-size";
+    size.textContent = fmtSize(entry.size);
+
+    const time = document.createElement("td");
+    const wrap = document.createElement("div");
+    wrap.className = "time-wrap";
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = fmtTime(entry.durationMs);
+    const wf = document.createElement("span");
+    wf.className = "wf";
+    wf.style.width =
+      Math.max(2, Math.round(((entry.durationMs || 0) / maxDur) * 90)) + "px";
+    wrap.appendChild(t);
+    wrap.appendChild(wf);
+    time.appendChild(wrap);
+
+    tr.appendChild(name);
+    tr.appendChild(method);
+    tr.appendChild(status);
+    tr.appendChild(size);
+    tr.appendChild(time);
+    tr.addEventListener("click", function () {
+      selectRow(entry, tr);
+    });
+    els.rows.appendChild(tr);
+  });
+}
+function updateSummary() {
+  const totalMs = entries.reduce(function (a, e) {
+    return a + (e.durationMs || 0);
+  }, 0);
+  const totalSize = entries.reduce(function (a, e) {
+    return a + (e.size || 0);
+  }, 0);
+  els.summary.textContent =
+    filtered.length +
+    (filtered.length === entries.length ? "" : "/" + entries.length) +
+    " calls · " +
+    fmtSize(totalSize) +
+    " · " +
+    fmtTime(totalMs);
+}
 
 function render() {
-  els.root.textContent = "";
-  const list = applyFilters(entries);
-
   if (!entries.length) {
     renderEmpty(null);
     return;
   }
+  els.net.hidden = false;
+  els.empty.hidden = true;
 
-  const totalMs = entries.reduce(function (a, e) {
-    return a + (e.durationMs || 0);
-  }, 0);
-  els.summary.textContent =
-    list.length +
-    (list.length === entries.length ? "" : "/" + entries.length) +
-    " calls · " +
-    totalMs +
-    "ms";
+  filtered = sortList(applyFilters(entries));
+  updateSummary();
+  renderRows(filtered);
+  updateSortIndicators();
 
-  if (!list.length) {
-    const div = document.createElement("div");
-    div.className = "empty";
-    div.textContent = "No calls match the current filter.";
-    els.root.appendChild(div);
-    return;
+  if (selectedEntry && entries.indexOf(selectedEntry) === -1) {
+    selectedEntry = null;
   }
-  list.forEach(function (e) {
-    els.root.appendChild(callRow(e));
-  });
+  renderDetail();
 }
 
-function showError() {
-  els.root.textContent = "";
-  els.summary.textContent = "";
-  const div = document.createElement("div");
-  div.className = "error";
-  div.textContent =
-    "Found #" + elementId + " but its contents are not valid JSON.";
-  els.root.appendChild(div);
-}
-
-// Adopt a detected/clicked element id. persist=true saves it as the default.
-function adoptId(id, persist) {
-  elementId = id;
-  els.elementId.value = id;
-  if (persist && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ elementId: id });
-  }
-  load();
-}
-
-// Empty state. With detected candidates, offer them by name so a first-time
-// user never has to guess the id; otherwise explain the contract.
 function renderEmpty(candidates) {
-  els.root.textContent = "";
+  els.net.hidden = true;
+  els.empty.hidden = false;
+  els.detail.hidden = true;
+  els.divider.hidden = true;
   els.summary.textContent = "";
+  els.empty.textContent = "";
+
   const div = document.createElement("div");
   div.className = "empty";
-
   if (candidates && candidates.length) {
     const p = document.createElement("p");
     p.innerHTML =
@@ -352,7 +449,6 @@ function renderEmpty(candidates) {
       elementId +
       "</code>, but this page exposes SSR data here:";
     div.appendChild(p);
-
     const list = document.createElement("div");
     list.className = "candidates";
     candidates.forEach(function (c) {
@@ -365,18 +461,31 @@ function renderEmpty(candidates) {
       list.appendChild(b);
     });
     div.appendChild(list);
-
     const hint = document.createElement("p");
     hint.textContent =
       "Click one to use it (saved as default), or set an id via the ⚙ gear.";
     div.appendChild(hint);
   } else {
     div.innerHTML =
-      '<p>No SSR data found on this page.</p>' +
+      "<p>No SSR data found on this page.</p>" +
       '<p>This panel reads a <code>&lt;script type="application/json" id="…"&gt;</code> array of your app\'s server-side fetches (default id <code>__ssr_data</code>).</p>' +
-      "<p>Open a <b>dev build</b> of a server-rendered page that fetches data, then <b>↻ Refresh</b>. If your app uses a different id, it will be offered here automatically — or set it via the ⚙ gear. See the README to add the emitter.</p>";
+      "<p>Open a <b>dev build</b> of a server-rendered page that fetches data, then <b>↻ Refresh</b>. A different id is offered here automatically — or set it via the ⚙ gear.</p>";
   }
-  els.root.appendChild(div);
+  els.empty.appendChild(div);
+}
+
+function showError() {
+  els.net.hidden = true;
+  els.empty.hidden = false;
+  els.detail.hidden = true;
+  els.divider.hidden = true;
+  els.summary.textContent = "";
+  els.empty.textContent = "";
+  const div = document.createElement("div");
+  div.className = "error";
+  div.textContent =
+    "Found #" + elementId + " but its contents are not valid JSON.";
+  els.empty.appendChild(div);
 }
 
 /* ---------- load ---------- */
@@ -389,10 +498,8 @@ function load() {
     }
     entries = Array.isArray(res.data) ? res.data : [];
     if (!entries.length) {
-      // Configured id had nothing — discover what the page actually exposes.
       detect(function (candidates) {
         if (candidates.length === 1 && candidates[0].id !== elementId) {
-          // Exactly one match → just use it for this session (gear shows it).
           adoptId(candidates[0].id, false);
           return;
         }
@@ -402,6 +509,31 @@ function load() {
     }
     render();
   });
+}
+
+// The data <script> is usually emitted LAST on the page, so it can stream in
+// just after the panel's first read. Re-check a few times so the user rarely
+// needs to press ↻ manually.
+function autoLoad() {
+  load();
+  let tries = 0;
+  clearInterval(retryTimer);
+  retryTimer = setInterval(function () {
+    if (entries.length || ++tries > 6) {
+      clearInterval(retryTimer);
+      return;
+    }
+    load();
+  }, 400);
+}
+
+function adoptId(id, persist) {
+  elementId = id;
+  els.elementId.value = id;
+  if (persist && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ elementId: id });
+  }
+  load();
 }
 
 /* ---------- color customization ---------- */
@@ -416,7 +548,6 @@ const COLOR_VARS = [
   { v: "--warn", label: "4xx" },
   { v: "--err", label: "5xx" },
 ];
-
 function applyColors(map) {
   if (!map) return;
   Object.keys(map).forEach(function (k) {
@@ -450,6 +581,7 @@ function buildColorPickers() {
     input.addEventListener("input", function () {
       document.body.style.setProperty(item.v, input.value);
       saveColors();
+      render();
     });
     const lab = document.createElement("label");
     lab.textContent = item.label;
@@ -466,9 +598,10 @@ function resetColors() {
     chrome.storage.local.remove("colors");
   }
   buildColorPickers();
+  render();
 }
 
-/* ---------- settings (configurable element id + colors) ---------- */
+/* ---------- settings ---------- */
 function initSettings() {
   if (!(chrome.storage && chrome.storage.local)) {
     els.elementId.value = elementId;
@@ -488,30 +621,30 @@ function initSettings() {
   );
 }
 function saveSettings() {
-  const next = els.elementId.value.trim() || DEFAULT_ID;
-  elementId = next;
+  elementId = els.elementId.value.trim() || DEFAULT_ID;
   els.settings.hidden = true;
   if (chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ elementId: next });
+    chrome.storage.local.set({ elementId: elementId });
   }
   load();
 }
 
-// The data <script> is usually emitted LAST on the page, so it can stream in
-// just after the panel's first read. Re-check a few times so the user rarely
-// needs to press ↻ manually.
-function autoLoad() {
-  load();
-  let tries = 0;
-  clearInterval(retryTimer);
-  retryTimer = setInterval(function () {
-    if (entries.length || ++tries > 6) {
-      clearInterval(retryTimer);
-      return;
-    }
-    load();
-  }, 400);
-}
+/* ---------- divider drag ---------- */
+els.divider.addEventListener("mousedown", function (e) {
+  e.preventDefault();
+  const startY = e.clientY;
+  const startH = els.detail.offsetHeight;
+  function move(ev) {
+    const h = Math.max(80, Math.min(window.innerHeight - 140, startH + (startY - ev.clientY)));
+    els.detail.style.height = h + "px";
+  }
+  function up() {
+    document.removeEventListener("mousemove", move);
+    document.removeEventListener("mouseup", up);
+  }
+  document.addEventListener("mousemove", move);
+  document.addEventListener("mouseup", up);
+});
 
 /* ---------- wire up ---------- */
 els.refresh.addEventListener("click", autoLoad);
@@ -519,10 +652,7 @@ els.filter.addEventListener("input", render);
 els.statusFilter.addEventListener("change", render);
 els.clear.addEventListener("click", function () {
   entries = [];
-  render();
-});
-els.toggleAll.addEventListener("click", function () {
-  allOpen = !allOpen;
+  selectedEntry = null;
   render();
 });
 els.gear.addEventListener("click", function () {
@@ -532,8 +662,33 @@ els.saveId.addEventListener("click", saveSettings);
 els.elementId.addEventListener("keydown", function (e) {
   if (e.key === "Enter") saveSettings();
 });
-const resetBtn = document.getElementById("resetColors");
-if (resetBtn) resetBtn.addEventListener("click", resetColors);
+if (els.resetColors) els.resetColors.addEventListener("click", resetColors);
+
+Array.prototype.forEach.call(els.head.querySelectorAll("th"), function (th) {
+  th.addEventListener("click", function () {
+    const key = th.dataset.key;
+    if (sortKey === key) sortDir = -sortDir;
+    else {
+      sortKey = key;
+      sortDir = 1;
+    }
+    render();
+  });
+});
+
+els.detail.querySelectorAll(".dtab").forEach(function (b) {
+  b.addEventListener("click", function () {
+    detailTab = b.dataset.tab;
+    renderDetail();
+  });
+});
+els.detailClose.addEventListener("click", function () {
+  selectedEntry = null;
+  Array.prototype.forEach.call(els.rows.querySelectorAll("tr.selected"), function (x) {
+    x.classList.remove("selected");
+  });
+  renderDetail();
+});
 
 if (chrome.devtools && chrome.devtools.network) {
   chrome.devtools.network.onNavigated.addListener(autoLoad);
