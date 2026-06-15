@@ -355,17 +355,6 @@ function renderDetail() {
       tree.appendChild(valueNode(payload));
       body.appendChild(tree);
     }
-  } else {
-    // timing
-    const block = kvBlock("Timing", [
-      ["Started", timeLabel(e.ts)],
-      ["Duration", fmtTime(e.durationMs)],
-    ]);
-    const bar = document.createElement("div");
-    bar.className = "bar";
-    bar.style.width = Math.max(4, Math.min(100, (e.durationMs || 0) / 30)) + "px";
-    block.appendChild(bar);
-    body.appendChild(block);
   }
 }
 

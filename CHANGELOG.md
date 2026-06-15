@@ -9,8 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 - Redesigned the panel into a **Network-tab–style** UI: a sortable columnar
   table (Name · Method · Status · Size · Time) with **waterfall bars** and row
-  selection, plus a **resizable split detail pane** with **Headers / Response /
-  Timing** tabs. Response has a **Tree ⇄ Raw** toggle and **Copy JSON**.
+  selection. Clicking a row collapses the list to URL-only and opens a
+  **resizable side-by-side detail pane** with **General** (Method/Status/Size/
+  Time table) **/ Headers / Response** tabs. Response has a **Tree ⇄ Raw**
+  toggle and **Copy JSON**.
 - Added 3xx / 4xx / 5xx status filters and a size+time summary.
 
 ## [0.1.0] — 2026-06-15

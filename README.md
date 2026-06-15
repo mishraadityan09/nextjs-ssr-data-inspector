@@ -61,10 +61,10 @@ A **Network-tab–style** UI:
 - **Color-coded methods** (GET / POST / PUT / PATCH / DELETE) and **status
   buckets** (2xx / 3xx / 4xx / 5xx) — **customizable** via color pickers (⚙).
 - **Side-by-side detail pane** — click a row to open a resizable pane (drag the
-  divider) with tabs:
-  - **Headers** — General + Request & Response headers
+  divider); the list collapses to URL-only while it's open. Tabs:
+  - **General** — Method · Status · Size · Time (with waterfall) + URL
+  - **Headers** — Request & Response headers
   - **Response** — syntax-highlighted JSON **tree** with a **Tree ⇄ Raw** toggle and **Copy JSON**
-  - **Timing** — duration
 - Filter by URL; filter by status (2xx / 3xx / 4xx / 5xx / errors); summary
   (`N calls · total size · total time`).
 - **Auto-detects** the page's SSR-data element — first run needs no setup; a
