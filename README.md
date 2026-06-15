@@ -54,18 +54,25 @@ gear if your app uses a different id.
 
 ## Features
 
-- **URL, method, status, duration, and response size** at a glance
+A **Network-tab–style** UI:
+
+- **Sortable columnar table** — Name · Method · Status · Size · Time. Click a
+  header to sort; **waterfall bars** scale to the slowest call.
 - **Color-coded methods** (GET / POST / PUT / PATCH / DELETE) and **status
-  buckets** (2xx / 3xx / 4xx / 5xx) — **fully customizable** via color pickers (⚙)
-- **Request & response headers** (redact secrets app-side before emitting)
-- Collapsible, **syntax-highlighted JSON** bodies (expand/collapse all)
-- Filter by URL; filter by status; **Copy JSON** per call; summary line
-- **Auto-detects** the page's SSR-data element — first run needs no setup; if
-  your app uses a different id it's offered **by name** (no guessing)
-- **Configurable element id** (⚙), persisted via `chrome.storage.local`
-- **Refresh** re-reads the latest server render; **auto-refresh** on full
-  navigation
-- Auto light / dark theme (matches DevTools)
+  buckets** (2xx / 3xx / 4xx / 5xx) — **customizable** via color pickers (⚙).
+- **Side-by-side detail pane** — click a row to open a resizable pane (drag the
+  divider) with tabs:
+  - **Headers** — General + Request & Response headers
+  - **Response** — syntax-highlighted JSON **tree** with a **Tree ⇄ Raw** toggle and **Copy JSON**
+  - **Timing** — duration
+- Filter by URL; filter by status (2xx / 3xx / 4xx / 5xx / errors); summary
+  (`N calls · total size · total time`).
+- **Auto-detects** the page's SSR-data element — first run needs no setup; a
+  different id is offered **by name**.
+- **Configurable element id** (⚙), persisted via `chrome.storage.local`.
+- **Refresh** re-reads the latest server render (auto-retries on first open;
+  auto-refresh on navigation).
+- Auto light / dark theme (matches DevTools).
 
 > **Scope of Refresh:** it reflects the page's **server render** — the initial
 > load plus RSC navigations to other server-rendered routes. Post-load **server
