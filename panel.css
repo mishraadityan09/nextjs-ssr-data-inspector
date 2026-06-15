@@ -185,7 +185,6 @@ code {
 /* Table */
 table#net {
   width: 100%;
-  min-width: 560px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -254,19 +253,16 @@ tbody tr:hover td.cell-name {
 tbody tr.selected td.cell-name {
   background: var(--sel);
 }
-/* When the detail pane is open, collapse the list to just the Name column —
-   Method/Status/Size/Time live in the detail pane (like the Network tab). */
-body.detail-open table#net {
-  min-width: 0;
-}
-body.detail-open .col-method,
-body.detail-open .col-status,
-body.detail-open .col-size,
-body.detail-open .col-time,
-body.detail-open .cell-method,
-body.detail-open .cell-status,
-body.detail-open .cell-size,
-body.detail-open .cell-time {
+/* The list shows ONLY the Name (URL). Method/Status/Size/Time live in the
+   detail pane on the right (like the Network tab). */
+.col-method,
+.col-status,
+.col-size,
+.col-time,
+.cell-method,
+.cell-status,
+.cell-size,
+.cell-time {
   display: none;
 }
 .cell-method {

@@ -208,7 +208,6 @@ function renderDetail() {
   if (!selectedEntry) {
     els.detail.hidden = true;
     els.divider.hidden = true;
-    document.body.classList.remove("detail-open");
     return;
   }
   els.detail.hidden = false;
@@ -307,7 +306,6 @@ function selectRow(entry, tr) {
     x.classList.remove("selected");
   });
   if (tr) tr.classList.add("selected");
-  document.body.classList.add("detail-open");
   renderDetail();
 }
 
