@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        width: 280px;
+        margin: 0;
+        padding: 14px;
+        color-scheme: light dark;
+      }
+      h1 {
+        font-size: 13px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 8px;
+      }
+      ol {
+        margin: 0 0 10px;
+        padding-left: 18px;
+      }
+      li {
+        margin-bottom: 4px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: rgba(128, 128, 128, 0.18);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      .muted {
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Next.js SSR Data Inspector</h1>
+    <p>This is a <b>DevTools panel</b>, not a popup.</p>
+    <ol>
+      <li>Open DevTools (<code>F12</code> / <code>⌥⌘I</code>)</li>
+      <li>Select the <b>SSR Data</b> tab (check the <code>»</code> overflow)</li>
+      <li>Open a server-rendered page, then <b>↻ Refresh</b></li>
+    </ol>
+    <p class="muted">
+      Reading element id: <code id="elId">__ssr_data</code><br />
+      Change it from the gear (⚙) in the panel toolbar.
+    </p>
+    <script src="popup.js"></script>
+  </body>
+</html>

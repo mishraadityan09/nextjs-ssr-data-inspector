@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Next.js SSR Data Inspector",
+  "short_name": "SSR Data",
+  "version": "0.1.0",
+  "description": "DevTools panel that shows the JSON a Next.js / SSR app fetched on the server — data that never appears in the Network tab.",
+  "minimum_chrome_version": "110",
+  "author": "Aditya Mishra",
+  "homepage_url": "https://github.com/mishraadityan09",
+  "permissions": ["storage"],
+  "devtools_page": "devtools.html",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Next.js SSR Data Inspector",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  }
+}
