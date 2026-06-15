@@ -386,6 +386,64 @@ body.detail-open .cell-time {
   padding: 8px 10px;
 }
 
+/* Persistent summary at the top of the detail pane (shown on every tab) */
+#detailHead {
+  flex: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--head-bg);
+}
+.dh-url {
+  color: var(--fg);
+  word-break: break-all;
+  margin-bottom: 6px;
+}
+.dh-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.dh-method {
+  font-weight: 700;
+}
+.dh-method.m-GET {
+  color: var(--m-get);
+}
+.dh-method.m-POST {
+  color: var(--m-post);
+}
+.dh-method.m-PUT {
+  color: var(--m-put);
+}
+.dh-method.m-PATCH {
+  color: var(--m-patch);
+}
+.dh-method.m-DELETE {
+  color: var(--m-delete);
+}
+.dh-status {
+  font-weight: 700;
+}
+.dh-status.s-ok {
+  color: var(--ok);
+}
+.dh-status.s-redir {
+  color: var(--redir);
+}
+.dh-status.s-warn {
+  color: var(--warn);
+}
+.dh-status.s-err {
+  color: var(--err);
+}
+.dh-dim {
+  color: var(--muted);
+}
+.dh-err {
+  color: var(--err);
+  margin-top: 6px;
+}
+
 /* Detail content */
 .block {
   margin-bottom: 14px;

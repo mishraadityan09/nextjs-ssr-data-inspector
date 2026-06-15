@@ -22,6 +22,7 @@ const els = {
   empty: document.getElementById("empty"),
   divider: document.getElementById("divider"),
   detail: document.getElementById("detail"),
+  detailHead: document.getElementById("detailHead"),
   detailBody: document.getElementById("detailBody"),
   detailClose: document.getElementById("detailClose"),
 };
@@ -219,21 +220,50 @@ function renderDetail() {
   });
 
   const e = selectedEntry;
+
+  // Persistent summary, shown on every tab.
+  els.detailHead.textContent = "";
+  const dhUrl = document.createElement("div");
+  dhUrl.className = "dh-url";
+  dhUrl.textContent = e.url || "";
+  dhUrl.title = e.url || "";
+  els.detailHead.appendChild(dhUrl);
+  const dhMeta = document.createElement("div");
+  dhMeta.className = "dh-meta";
+  const dhM = document.createElement("span");
+  dhM.className = "dh-method m-" + (e.method || "GET").toUpperCase();
+  dhM.textContent = e.method || "GET";
+  const dhS = document.createElement("span");
+  dhS.className = "dh-status s-" + statusClass(e.status);
+  dhS.textContent = e.status != null ? e.status : "—";
+  const dhZ = document.createElement("span");
+  dhZ.className = "dh-dim";
+  dhZ.textContent = fmtSize(e.size);
+  const dhT = document.createElement("span");
+  dhT.className = "dh-dim";
+  dhT.textContent = fmtTime(e.durationMs);
+  dhMeta.appendChild(dhM);
+  dhMeta.appendChild(dhS);
+  dhMeta.appendChild(dhZ);
+  dhMeta.appendChild(dhT);
+  if (e.ts) {
+    const dhW = document.createElement("span");
+    dhW.className = "dh-dim";
+    dhW.textContent = timeLabel(e.ts);
+    dhMeta.appendChild(dhW);
+  }
+  els.detailHead.appendChild(dhMeta);
+  if (e.error != null) {
+    const dhErr = document.createElement("div");
+    dhErr.className = "dh-err";
+    dhErr.textContent = "Error: " + e.error;
+    els.detailHead.appendChild(dhErr);
+  }
+
   const body = els.detailBody;
   body.textContent = "";
 
   if (detailTab === "headers") {
-    body.appendChild(
-      kvBlock("General", [
-        ["Request URL", e.url],
-        ["Method", e.method || "GET"],
-        ["Status", e.status != null ? e.status : "—"],
-        ["Size", fmtSize(e.size)],
-        ["Time", fmtTime(e.durationMs)],
-        ["When", timeLabel(e.ts)],
-        ["Error", e.error],
-      ]),
-    );
     const rq = headerBlock("Request Headers", e.reqHeaders);
     const rs = headerBlock("Response Headers", e.resHeaders);
     if (rq) body.appendChild(rq);
@@ -375,6 +405,7 @@ function renderRows(list) {
     size.textContent = fmtSize(entry.size);
 
     const time = document.createElement("td");
+    time.className = "cell-time";
     const wrap = document.createElement("div");
     wrap.className = "time-wrap";
     const t = document.createElement("span");
