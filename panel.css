@@ -260,14 +260,14 @@ tbody tr.selected td.cell-name {
 body.detail-open table#net {
   min-width: 0;
 }
-body.detail-open .col-method,
-body.detail-open .col-status,
-body.detail-open .col-size,
-body.detail-open .col-time,
-body.detail-open .cell-method,
-body.detail-open .cell-status,
-body.detail-open .cell-size,
-body.detail-open .cell-time {
+body.detail-open #net .col-method,
+body.detail-open #net .col-status,
+body.detail-open #net .col-size,
+body.detail-open #net .col-time,
+body.detail-open #net .cell-method,
+body.detail-open #net .cell-status,
+body.detail-open #net .cell-size,
+body.detail-open #net .cell-time {
   display: none;
 }
 .cell-method {
@@ -442,6 +442,26 @@ body.detail-open .cell-time {
 .dh-err {
   color: var(--err);
   margin-top: 6px;
+}
+
+/* General tab — Method/Status/Size/Time as a small table */
+.meta-table {
+  border-collapse: collapse;
+  margin: 4px 0 12px;
+}
+.meta-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 3px 18px 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.meta-table td {
+  padding: 6px 18px 6px 0;
+  vertical-align: middle;
+}
+.meta-table .cell-size {
+  text-align: left;
 }
 
 /* Detail content */

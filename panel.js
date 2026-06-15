@@ -22,7 +22,6 @@ const els = {
   empty: document.getElementById("empty"),
   divider: document.getElementById("divider"),
   detail: document.getElementById("detail"),
-  detailHead: document.getElementById("detailHead"),
   detailBody: document.getElementById("detailBody"),
   detailClose: document.getElementById("detailClose"),
 };
@@ -33,7 +32,7 @@ let filtered = [];
 let selectedEntry = null;
 let sortKey = null; // null = insertion order
 let sortDir = 1; // 1 asc, -1 desc
-let detailTab = "headers";
+let detailTab = "general";
 let rawResponse = false;
 let retryTimer = null;
 
@@ -205,6 +204,66 @@ function headerBlock(title, h) {
   return kvBlock(title, pairs);
 }
 
+// Method / Status / Size / Time for the selected request, as a small table
+// (matching the main list's columns) — shown in the General tab.
+function metaTable(e) {
+  const maxDur =
+    entries.reduce(function (mx, x) {
+      return Math.max(mx, x.durationMs || 0);
+    }, 0) || 1;
+
+  const table = document.createElement("table");
+  table.className = "meta-table";
+
+  const thead = document.createElement("thead");
+  const htr = document.createElement("tr");
+  ["Method", "Status", "Size", "Time"].forEach(function (h) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  const tr = document.createElement("tr");
+
+  const m = document.createElement("td");
+  m.className = "cell-method m-" + (e.method || "GET").toUpperCase();
+  m.textContent = e.method || "GET";
+
+  const s = document.createElement("td");
+  s.className = "cell-status s-" + statusClass(e.status);
+  s.textContent = e.status != null ? e.status : "—";
+
+  const z = document.createElement("td");
+  z.className = "cell-size";
+  z.textContent = fmtSize(e.size);
+
+  const t = document.createElement("td");
+  t.className = "cell-time";
+  const wrap = document.createElement("div");
+  wrap.className = "time-wrap";
+  const tt = document.createElement("span");
+  tt.className = "t";
+  tt.textContent = fmtTime(e.durationMs);
+  const wf = document.createElement("span");
+  wf.className = "wf";
+  wf.style.width =
+    Math.max(2, Math.round(((e.durationMs || 0) / maxDur) * 90)) + "px";
+  wrap.appendChild(tt);
+  wrap.appendChild(wf);
+  t.appendChild(wrap);
+
+  tr.appendChild(m);
+  tr.appendChild(s);
+  tr.appendChild(z);
+  tr.appendChild(t);
+  tbody.appendChild(tr);
+  table.appendChild(tbody);
+  return table;
+}
+
 function renderDetail() {
   if (!selectedEntry) {
     els.detail.hidden = true;
@@ -220,50 +279,29 @@ function renderDetail() {
   });
 
   const e = selectedEntry;
-
-  // Persistent summary, shown on every tab.
-  els.detailHead.textContent = "";
-  const dhUrl = document.createElement("div");
-  dhUrl.className = "dh-url";
-  dhUrl.textContent = e.url || "";
-  dhUrl.title = e.url || "";
-  els.detailHead.appendChild(dhUrl);
-  const dhMeta = document.createElement("div");
-  dhMeta.className = "dh-meta";
-  const dhM = document.createElement("span");
-  dhM.className = "dh-method m-" + (e.method || "GET").toUpperCase();
-  dhM.textContent = e.method || "GET";
-  const dhS = document.createElement("span");
-  dhS.className = "dh-status s-" + statusClass(e.status);
-  dhS.textContent = e.status != null ? e.status : "—";
-  const dhZ = document.createElement("span");
-  dhZ.className = "dh-dim";
-  dhZ.textContent = fmtSize(e.size);
-  const dhT = document.createElement("span");
-  dhT.className = "dh-dim";
-  dhT.textContent = fmtTime(e.durationMs);
-  dhMeta.appendChild(dhM);
-  dhMeta.appendChild(dhS);
-  dhMeta.appendChild(dhZ);
-  dhMeta.appendChild(dhT);
-  if (e.ts) {
-    const dhW = document.createElement("span");
-    dhW.className = "dh-dim";
-    dhW.textContent = timeLabel(e.ts);
-    dhMeta.appendChild(dhW);
-  }
-  els.detailHead.appendChild(dhMeta);
-  if (e.error != null) {
-    const dhErr = document.createElement("div");
-    dhErr.className = "dh-err";
-    dhErr.textContent = "Error: " + e.error;
-    els.detailHead.appendChild(dhErr);
-  }
-
   const body = els.detailBody;
   body.textContent = "";
 
-  if (detailTab === "headers") {
+  if (detailTab === "general") {
+    const url = document.createElement("div");
+    url.className = "dh-url";
+    url.textContent = e.url || "";
+    url.title = e.url || "";
+    body.appendChild(url);
+    body.appendChild(metaTable(e));
+    if (e.ts) {
+      const when = document.createElement("div");
+      when.className = "dh-dim";
+      when.textContent = "When: " + timeLabel(e.ts);
+      body.appendChild(when);
+    }
+    if (e.error != null) {
+      const err = document.createElement("div");
+      err.className = "dh-err";
+      err.textContent = "Error: " + e.error;
+      body.appendChild(err);
+    }
+  } else if (detailTab === "headers") {
     const rq = headerBlock("Request Headers", e.reqHeaders);
     const rs = headerBlock("Response Headers", e.resHeaders);
     if (rq) body.appendChild(rq);
