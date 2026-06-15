@@ -632,11 +632,11 @@ function saveSettings() {
 /* ---------- divider drag ---------- */
 els.divider.addEventListener("mousedown", function (e) {
   e.preventDefault();
-  const startY = e.clientY;
-  const startH = els.detail.offsetHeight;
+  const startX = e.clientX;
+  const startW = els.detail.offsetWidth;
   function move(ev) {
-    const h = Math.max(80, Math.min(window.innerHeight - 140, startH + (startY - ev.clientY)));
-    els.detail.style.height = h + "px";
+    const w = Math.max(220, Math.min(window.innerWidth - 200, startW + (startX - ev.clientX)));
+    els.detail.style.width = w + "px";
   }
   function up() {
     document.removeEventListener("mousemove", move);

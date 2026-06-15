@@ -172,12 +172,13 @@ code {
 #main {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 0;
 }
 #list {
   flex: 1;
   overflow: auto;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -287,25 +288,26 @@ tbody tr.selected {
   flex: none;
 }
 
-/* Divider */
+/* Divider (vertical, between list and detail) */
 #divider {
   flex: none;
-  height: 6px;
+  width: 6px;
   background: var(--border);
-  cursor: row-resize;
+  cursor: col-resize;
 }
 #divider:hover {
   background: var(--accent);
 }
 
-/* Detail pane */
+/* Detail pane (right side) */
 #detail {
   flex: none;
-  height: 240px;
-  min-height: 80px;
+  width: 440px;
+  min-width: 220px;
+  max-width: 70%;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   overflow: hidden;
 }
 #detailTabs {
