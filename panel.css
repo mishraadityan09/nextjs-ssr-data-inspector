@@ -254,6 +254,21 @@ tbody tr:hover td.cell-name {
 tbody tr.selected td.cell-name {
   background: var(--sel);
 }
+/* When the detail pane is open, collapse the list to just the Name column —
+   Method/Status/Size/Time live in the detail pane (like the Network tab). */
+body.detail-open table#net {
+  min-width: 0;
+}
+body.detail-open .col-method,
+body.detail-open .col-status,
+body.detail-open .col-size,
+body.detail-open .col-time,
+body.detail-open .cell-method,
+body.detail-open .cell-status,
+body.detail-open .cell-size,
+body.detail-open .cell-time {
+  display: none;
+}
 .cell-method {
   font-weight: 700;
 }
