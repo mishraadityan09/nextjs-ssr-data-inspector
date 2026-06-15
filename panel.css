@@ -310,6 +310,12 @@ tbody tr.selected {
   border-left: 1px solid var(--border);
   overflow: hidden;
 }
+/* These set display, which would otherwise override the `hidden` attribute. */
+#settings[hidden],
+#detail[hidden],
+#net[hidden] {
+  display: none;
+}
 #detailTabs {
   flex: none;
   display: flex;
