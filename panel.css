@@ -185,13 +185,14 @@ code {
 /* Table */
 table#net {
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
   table-layout: fixed;
 }
 thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   text-align: left;
   font-weight: 600;
   color: var(--muted);
@@ -232,6 +233,25 @@ tbody tr:hover {
   background: var(--row-hover);
 }
 tbody tr.selected {
+  background: var(--sel);
+}
+/* Keep the Name (URL) column pinned/visible while scrolling, like Network. */
+th.col-name,
+td.cell-name {
+  position: sticky;
+  left: 0;
+}
+thead th.col-name {
+  z-index: 3;
+}
+tbody td.cell-name {
+  z-index: 1;
+  background: var(--bg);
+}
+tbody tr:hover td.cell-name {
+  background: var(--row-hover);
+}
+tbody tr.selected td.cell-name {
   background: var(--sel);
 }
 .cell-method {
